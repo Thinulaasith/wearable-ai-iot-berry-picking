@@ -1,0 +1,27 @@
+.rmschart-container {
+  background-color: #2a2f37;
+  color: #f1f5f9;
+  border-radius: 12px;
+  padding: 1rem 1.5rem;
+  box-shadow: 0 0 12px rgba(0, 0, 0, 0.4);
+  width: 100%;
+  max-width: 100%;
+}
+
+.rmschart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
+.rmschart-header .samples {
+  font-size: 0.8rem;
+  opacity: 0.8;
+}
+
+.rmschart-graph {
+  height: 320px; /* tweak as you like */
+}

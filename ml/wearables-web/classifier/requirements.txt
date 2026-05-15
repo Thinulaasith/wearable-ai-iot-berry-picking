@@ -1,0 +1,17 @@
+certifi==2025.6.15
+influxdb-client==1.49.0
+joblib==1.5.1
+numpy==2.3.1
+pandas==2.3.0
+pip==22.3.1
+python-dateutil==2.9.0.post0
+pytz==2025.2
+reactivex==4.0.4
+scikit-learn==1.6.1
+scipy==1.16.0
+setuptools==65.5.0
+six==1.17.0
+threadpoolctl==3.6.0
+typing-extensions==4.14.0
+tzdata==2025.2
+urllib3==2.2.0  # assumed from common dependency

@@ -1,0 +1,95 @@
+.demo-section-90 {
+  width: 90%;
+  margin: 2rem auto;
+}
+
+.demo-split-layout {
+  display: flex;
+  gap: 2rem;
+}
+
+/* Left column: line charts stacked */
+.left-column {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+/* Right column: table top 30%, pie bottom 70% */
+.right-column {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.demo-table {
+  flex: 0 0 30%;
+  background-color: #f9f9f9;
+  padding: 1rem;
+  border-radius: 10px;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+.demo-pie {
+  flex: 0 0 70%;
+  text-align: center;
+}
+
+.demo-table h3,
+.demo-pie h3 {
+  text-align: center;
+  margin-bottom: 1rem;
+}
+
+.demo-table table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.demo-table th,
+.demo-table td {
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  text-align: left;
+}
+
+/* Optional: make charts centered if needed */
+.demo-chart {
+  text-align: center;
+}
+
+.demo-section-90 {
+    margin-top: 40px;
+}
+
+/* supersized status tile */
+.status-card {
+  min-width: 320px;   /* wider */
+  min-height: 180px;  /* taller */
+  border-radius: 20px;
+  box-shadow: 0 0 18px rgba(0, 0, 0, 0.15);
+}
+
+/* darker, punchier colours (optional) */
+.card.bg-success   { background-color: #28a745 !important; }
+.card.bg-danger    { background-color: #dc3545 !important; }
+.card.bg-secondary { background-color: #6c757d !important; }
+
+.metric-tile {
+  width: 160px;
+  padding: 12px 0;
+  text-align: center;
+  font-weight: 700;
+  font-size: 1.25rem;
+  border-radius: 8px;
+  color: #fff;
+}
+
+.idle-tile  { background:#6c757d; }     /* Bootstrap “secondary” gray */
+.good-tile  { background:#198754; }     /* Bootstrap “success” green */
+
+.vr {
+  border-left: 2px solid #dee2e6;       /* subtle Bootstrap-style rule */
+}
