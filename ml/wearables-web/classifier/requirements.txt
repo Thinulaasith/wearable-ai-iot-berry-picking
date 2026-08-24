@@ -15,3 +15,4 @@ threadpoolctl==3.6.0
 typing-extensions==4.14.0
 tzdata==2025.2
 urllib3==2.2.0  # assumed from common dependency
+xgboost
