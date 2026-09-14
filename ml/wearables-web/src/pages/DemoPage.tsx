@@ -41,10 +41,19 @@ type Stage = (typeof Stage)[keyof typeof Stage];
 
 // ---------------- Constants ----------------
 const ACTIVITY_NAMES: Record<number, string> = {
-    1: 'Bending',
-    2: 'Idle',
-    3: 'Picking',
+    0: 'Bending',
+    1: 'Idle',
+    2: 'Good Picking',
+    3: 'Bad Picking',
     4: 'Pushing',
+};
+
+const ACTIVITY_COLORS: Record<number, string> = {
+    0: '#0d6efd', // Bending
+    1: '#6c757d', // Idle
+    2: '#198754', // Good Picking
+    3: '#ffc107', // Bad Picking
+    4: '#dc3545', // Pushing
 };
 
 // Canonical keys used by your demos data (imported from ../data/demos)
@@ -142,7 +151,7 @@ const DemoPage: React.FC = () => {
     }, [partA, partB]);
 
     const [demoLength, setDemoLength] = useState<number>(60);
-    const [classificationData, setClassificationData] = useState<ChartPoint[]>([]);
+    const [, setClassificationData] = useState<ChartPoint[]>([]);
     const [actionCode, setActionCode] = useState<number | null>(null);
 
     // Available sensors (exclude those already assigned)
@@ -160,63 +169,28 @@ const DemoPage: React.FC = () => {
         setSlots((prev) => (prev ? { ...prev, [slot]: { ...prev[slot], sensor } } : prev));
 
     // ---------------- Controls ----------------
-    //TODO uncomment this
-    // const handleStart = () => {
-    //     if (!demo || !slots) {
-    //         alert('Demo not ready.');
-    //         return;
-    //     }
-
-    //     const chosen = (['A', 'B'] as const)
-    //         .map((k) => slots[k])
-    //         .filter((s): s is { body_part: BodyPartKey; sensor: Sensor } => !!s.sensor);
-
-    //     if (chosen.length !== 2) {
-    //         alert('Assign a sensor to both body parts.');
-    //         return;
-    //     }
-    //     if (!Number.isFinite(demoLength) || demoLength <= 0) {
-    //         alert('Demo length must be a positive integer.');
-    //         return;
-    //     }
-
-    //     setDemoStartTime(Date.now());
-    //     setActionCode(null);
-    //     setClassificationData([]);
-    //     setStage(Stage.LiveGraphs);
-
-    //     fetch('http://localhost:5000/start-multiple', {
-    //         method: 'POST',
-    //         headers: { 'Content-Type': 'application/json' },
-    //         body: JSON.stringify({
-    //             sensors: chosen.map((c) => ({
-    //                 sensor_id: c.sensor.address,
-    //                 body_part: c.body_part,
-    //             })),
-    //             activity: demo.activity,
-    //             duration: demoLength,
-    //             model_name: selectedModel,
-    //         }),
-    //     })
-    //         .then((r) => r.json())
-    //         .catch((err) => console.error('Failed to start sensors:', err));
-    // };
-
-    // const handleStop = () => {
-    //     if (timeoutRef.current) {
-    //         clearTimeout(timeoutRef.current);
-    //         timeoutRef.current = null;
-    //     }
-
-    //     fetch('http://localhost:5000/stop-all', { method: 'POST' })
-    //         .then((res) => res.json())
-    //         .then(() => setStage(Stage.Summary))
-    //         .catch((err) => console.error('Failed to stop sensors:', err));
-    // };
-
     const handleStart = async () => {
+        if (!demo || !slots) {
+            alert('Demo not ready.');
+            return;
+        }
+
+        const chosen = (['A', 'B'] as const)
+            .map((k) => slots[k])
+            .filter((s): s is { body_part: BodyPartKey; sensor: Sensor } => !!s.sensor);
+
+        if (chosen.length !== 2) {
+            alert('Assign a sensor to both body parts.');
+            return;
+        }
+
+        if (!Number.isFinite(demoLength) || demoLength <= 0) {
+            alert('Demo length must be a positive integer.');
+            return;
+        }
+
         try {
-            // 1. Screen sharing must be requested directly from the button click
+            // Screen sharing first because it requires direct user interaction
             const screenStream = await navigator.mediaDevices.getDisplayMedia({
                 video: true,
                 audio: false,
@@ -224,7 +198,7 @@ const DemoPage: React.FC = () => {
 
             screenStreamRef.current = screenStream;
 
-            // 2. Ask for camera permission
+            // Camera permission
             const cameraStream = await navigator.mediaDevices.getUserMedia({
                 video: true,
                 audio: false,
@@ -232,7 +206,7 @@ const DemoPage: React.FC = () => {
 
             cameraStreamRef.current = cameraStream;
 
-            // 3. Prepare screen recording
+            // Prepare screen recording
             recordedChunksRef.current = [];
             setRecordingBlob(null);
 
@@ -253,16 +227,36 @@ const DemoPage: React.FC = () => {
                 setRecordingBlob(blob);
 
                 screenStreamRef.current?.getTracks().forEach((track) => track.stop());
+
                 screenStreamRef.current = null;
             };
 
             recorder.start();
 
-            // 4. Start demo only after screen + camera both succeed
+            // Reset demo state
             setDemoStartTime(Date.now());
             setActionCode(null);
             setClassificationData([]);
             setStage(Stage.LiveGraphs);
+
+            // Start sensors / ML backend
+            fetch('http://localhost:5000/start-multiple', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    sensors: chosen.map((c) => ({
+                        sensor_id: c.sensor.address,
+                        body_part: c.body_part,
+                    })),
+                    activity: demo.activity,
+                    duration: demoLength,
+                    model_name: selectedModel,
+                }),
+            })
+                .then((r) => r.json())
+                .catch((err) => console.error('Failed to start sensors:', err));
         } catch (error) {
             console.error('Camera or screen permission failed:', error);
 
@@ -271,23 +265,33 @@ const DemoPage: React.FC = () => {
 
             cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
             cameraStreamRef.current = null;
-
-            alert('Camera or screen sharing permission failed. Check the browser console.');
         }
     };
 
-    const handleStop = () => {
+    const handleStop = async () => {
         if (timeoutRef.current) {
             clearTimeout(timeoutRef.current);
             timeoutRef.current = null;
         }
 
+        // Stop screen recording
         if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
             mediaRecorderRef.current.stop();
         }
 
+        // Stop camera
         cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
+
         cameraStreamRef.current = null;
+
+        // Stop sensors / backend
+        try {
+            await fetch('http://localhost:5000/stop-all', {
+                method: 'POST',
+            });
+        } catch (error) {
+            console.error('Failed to stop sensors:', error);
+        }
 
         setStage(Stage.Summary);
     };
@@ -501,7 +505,7 @@ const DemoPage: React.FC = () => {
 
             {stage === Stage.LiveGraphs && (
                 <>
-                    <Row className="mt-4">
+                    <Row className="mt-2">
                         <Col md={6} className="mx-auto">
                             <video
                                 ref={cameraVideoRef}
@@ -510,68 +514,39 @@ const DemoPage: React.FC = () => {
                                 playsInline
                                 style={{
                                     width: '100%',
+                                    height: '180px',
+                                    objectFit: 'cover',
                                     borderRadius: '12px',
                                     backgroundColor: '#000',
                                 }}
                             />
                         </Col>
                     </Row>
-                    {/*TODO uncomment this when you have the backend working*/}
 
-                    {/* <Row className="mt-4">
-                        {slots.A.sensor && (
-                            <Col md={6}>
-                                <RMSChart sensor={slots.A.sensor} />
-                            </Col>
-                        )}
-                        {slots.B.sensor && (
-                            <Col md={6}>
-                                <RMSChart sensor={slots.B.sensor} />
-                            </Col>
-                        )}
-                    </Row> */}
+                    {
+                        <Row className="mt-2">
+                            {slots.A.sensor && (
+                                <Col md={6}>
+                                    <RMSChart sensor={slots.A.sensor} />
+                                </Col>
+                            )}
+                            {slots.B.sensor && (
+                                <Col md={6}>
+                                    <RMSChart sensor={slots.B.sensor} />
+                                </Col>
+                            )}
+                        </Row>
+                    }
 
-                    <Row className="mt-4">
-                        <Col md={6}>
-                            <div className="rmschart-container">
-                                <div className="rmschart-header">
-                                    <span className="tag">TAG ID MOCK</span>
-                                    <span className="address">Wrist Sensor</span>
-                                    <span className="samples">0 pts</span>
-                                </div>
-
-                                <div className="rmschart-graph" />
-                            </div>
-                        </Col>
-
-                        <Col md={6}>
-                            <div className="rmschart-container">
-                                <div className="rmschart-header">
-                                    <span className="tag">TAG ID MOCK</span>
-                                    <span className="address">Leg Sensor</span>
-                                    <span className="samples">0 pts</span>
-                                </div>
-
-                                <div className="rmschart-graph" />
-                            </div>
-                        </Col>
-                    </Row>
-
-                    <Row className="mt-3">
+                    <Row className="mt-2">
                         <Col className="d-flex justify-content-center">
                             <Card
                                 className="status-card"
                                 style={{
                                     backgroundColor:
                                         actionCode === null
-                                            ? '#6c757d' // gray for LOADING
-                                            : actionCode === 1
-                                              ? '#0d6efd' // Bending → blue
-                                              : actionCode === 2
-                                                ? '#6c757d' // Idle → gray
-                                                : actionCode === 3
-                                                  ? '#ffc107' // Picking → yellow
-                                                  : '#dc3545', // Pushing → red
+                                            ? '#6c757d'
+                                            : (ACTIVITY_COLORS[actionCode] ?? '#6c757d'),
                                 }}
                                 text="white"
                             >
@@ -582,7 +557,7 @@ const DemoPage: React.FC = () => {
                         </Col>
                     </Row>
 
-                    <Row className="mt-5">
+                    <Row className="mt-2">
                         <Col className="d-flex justify-content-center">
                             <Button variant="danger" onClick={handleStop}>
                                 Stop Demo
