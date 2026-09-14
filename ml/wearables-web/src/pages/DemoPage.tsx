@@ -4,7 +4,7 @@ import type { Demo, BodyPartKey } from '../data/demos';
 import { demos } from '../data/demos';
 
 import Card from 'react-bootstrap/Card';
-import { Container, Row, Col, Form, Button, ToggleButton } from 'react-bootstrap';
+import { Container, Row, Col, Form, Button } from 'react-bootstrap';
 
 import { useSensorContext } from '../context/SensorContext';
 import BodyPartBox from '../components/BodyPartBox';
@@ -82,6 +82,16 @@ const BODY_PART_META: Record<BodyPartKey, { label: string; img: string; desc: st
         img: wristImg,
         desc: 'Place on the outside of the dominant wrist.',
     },
+    left_wrist: {
+        label: 'Left Wrist',
+        img: wristImg,
+        desc: 'Place the sensor on the left wrist.',
+    },
+    right_wrist: {
+        label: 'Right Wrist',
+        img: wristImg,
+        desc: 'Place the sensor on the right wrist.',
+    },
 };
 
 type Assignment = { body_part: BodyPartKey; sensor: Sensor | null };
@@ -90,12 +100,20 @@ type Assignment = { body_part: BodyPartKey; sensor: Sensor | null };
 const DemoPage: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
+
+    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+    const screenStreamRef = useRef<MediaStream | null>(null);
+    const recordedChunksRef = useRef<Blob[]>([]);
+    const cameraStreamRef = useRef<MediaStream | null>(null);
+    const cameraVideoRef = useRef<HTMLVideoElement | null>(null);
+
+    const [recordingBlob, setRecordingBlob] = useState<Blob | null>(null);
+
     const demo: Demo | null = useMemo(() => demos.find((d) => d.id === id) ?? null, [id]);
 
-    const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const { sensors } = useSensorContext();
 
-    const [viewClassification, setViewClassification] = useState(false);
     const [stage, setStage] = useState<Stage>(Stage.Assign);
     const [demoStartTime, setDemoStartTime] = useState<number | null>(null);
 
@@ -142,85 +160,120 @@ const DemoPage: React.FC = () => {
         setSlots((prev) => (prev ? { ...prev, [slot]: { ...prev[slot], sensor } } : prev));
 
     // ---------------- Controls ----------------
-    const handleStart = () => {
-        if (!demo || !slots) {
-            alert('Demo not ready.');
-            return;
+    //TODO uncomment this
+    // const handleStart = () => {
+    //     if (!demo || !slots) {
+    //         alert('Demo not ready.');
+    //         return;
+    //     }
+
+    //     const chosen = (['A', 'B'] as const)
+    //         .map((k) => slots[k])
+    //         .filter((s): s is { body_part: BodyPartKey; sensor: Sensor } => !!s.sensor);
+
+    //     if (chosen.length !== 2) {
+    //         alert('Assign a sensor to both body parts.');
+    //         return;
+    //     }
+    //     if (!Number.isFinite(demoLength) || demoLength <= 0) {
+    //         alert('Demo length must be a positive integer.');
+    //         return;
+    //     }
+
+    //     setDemoStartTime(Date.now());
+    //     setActionCode(null);
+    //     setClassificationData([]);
+    //     setStage(Stage.LiveGraphs);
+
+    //     fetch('http://localhost:5000/start-multiple', {
+    //         method: 'POST',
+    //         headers: { 'Content-Type': 'application/json' },
+    //         body: JSON.stringify({
+    //             sensors: chosen.map((c) => ({
+    //                 sensor_id: c.sensor.address,
+    //                 body_part: c.body_part,
+    //             })),
+    //             activity: demo.activity,
+    //             duration: demoLength,
+    //             model_name: selectedModel,
+    //         }),
+    //     })
+    //         .then((r) => r.json())
+    //         .catch((err) => console.error('Failed to start sensors:', err));
+    // };
+
+    // const handleStop = () => {
+    //     if (timeoutRef.current) {
+    //         clearTimeout(timeoutRef.current);
+    //         timeoutRef.current = null;
+    //     }
+
+    //     fetch('http://localhost:5000/stop-all', { method: 'POST' })
+    //         .then((res) => res.json())
+    //         .then(() => setStage(Stage.Summary))
+    //         .catch((err) => console.error('Failed to stop sensors:', err));
+    // };
+
+    const handleStart = async () => {
+        try {
+            // 1. Screen sharing must be requested directly from the button click
+            const screenStream = await navigator.mediaDevices.getDisplayMedia({
+                video: true,
+                audio: false,
+            });
+
+            screenStreamRef.current = screenStream;
+
+            // 2. Ask for camera permission
+            const cameraStream = await navigator.mediaDevices.getUserMedia({
+                video: true,
+                audio: false,
+            });
+
+            cameraStreamRef.current = cameraStream;
+
+            // 3. Prepare screen recording
+            recordedChunksRef.current = [];
+            setRecordingBlob(null);
+
+            const recorder = new MediaRecorder(screenStream);
+            mediaRecorderRef.current = recorder;
+
+            recorder.ondataavailable = (event) => {
+                if (event.data.size > 0) {
+                    recordedChunksRef.current.push(event.data);
+                }
+            };
+
+            recorder.onstop = () => {
+                const blob = new Blob(recordedChunksRef.current, {
+                    type: recorder.mimeType || 'video/webm',
+                });
+
+                setRecordingBlob(blob);
+
+                screenStreamRef.current?.getTracks().forEach((track) => track.stop());
+                screenStreamRef.current = null;
+            };
+
+            recorder.start();
+
+            // 4. Start demo only after screen + camera both succeed
+            setDemoStartTime(Date.now());
+            setActionCode(null);
+            setClassificationData([]);
+            setStage(Stage.LiveGraphs);
+        } catch (error) {
+            console.error('Camera or screen permission failed:', error);
+
+            screenStreamRef.current?.getTracks().forEach((track) => track.stop());
+            screenStreamRef.current = null;
+
+            cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
+            cameraStreamRef.current = null;
+
+            alert('Camera or screen sharing permission failed. Check the browser console.');
         }
-
-        const chosen = (['A', 'B'] as const)
-            .map((k) => slots[k])
-            .filter((s): s is { body_part: BodyPartKey; sensor: Sensor } => !!s.sensor);
-
-        if (chosen.length !== 2) {
-            alert('Assign a sensor to both body parts.');
-            return;
-        }
-        if (!Number.isFinite(demoLength) || demoLength <= 0) {
-            alert('Demo length must be a positive integer.');
-            return;
-        }
-
-        setDemoStartTime(Date.now());
-        setActionCode(null);
-        setClassificationData([]);
-        setStage(Stage.LiveGraphs);
-
-        fetch('http://localhost:5000/start-multiple', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                sensors: chosen.map((c) => ({
-                    sensor_id: c.sensor.address,
-                    body_part: c.body_part,
-                })),
-                activity: demo.activity,
-                duration: demoLength,
-                model_name: selectedModel,
-            }),
-        })
-            .then((r) => r.json())
-            .catch((err) => console.error('Failed to start sensors:', err));
-    };
-
-    const handleRedo = () => {
-        if (timeoutRef.current) {
-            clearTimeout(timeoutRef.current);
-            timeoutRef.current = null;
-        }
-        if (!demo || !slots) return;
-
-        const chosen = (['A', 'B'] as const)
-            .map((k) => slots[k])
-            .filter((s): s is { body_part: BodyPartKey; sensor: Sensor } => !!s.sensor);
-
-        if (chosen.length !== 2) {
-            alert('Assign a sensor to both body parts.');
-            return;
-        }
-
-        setDemoStartTime(Date.now());
-        setActionCode(null);
-        setClassificationData([]);
-        setStage(Stage.LiveGraphs);
-        setViewClassification(false);
-
-        fetch('http://localhost:5000/start-multiple', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                sensors: (['A', 'B'] as const).map((k) => ({
-                    sensor_id: slots[k]!.sensor!.address,
-                    body_part: slots[k]!.body_part,
-                    slot: k,
-                })),
-                activity: demo.activity,
-                duration: demoLength,
-                model_name: selectedModel,
-            }),
-        })
-            .then((r) => r.json())
-            .catch((err) => console.error('Failed to restart demo:', err));
     };
 
     const handleStop = () => {
@@ -229,10 +282,27 @@ const DemoPage: React.FC = () => {
             timeoutRef.current = null;
         }
 
-        fetch('http://localhost:5000/stop-all', { method: 'POST' })
-            .then((res) => res.json())
-            .then(() => setStage(Stage.Summary))
-            .catch((err) => console.error('Failed to stop sensors:', err));
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+            mediaRecorderRef.current.stop();
+        }
+
+        cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
+        cameraStreamRef.current = null;
+
+        setStage(Stage.Summary);
+    };
+
+    const handleDownloadRecording = () => {
+        if (!recordingBlob) return;
+
+        const url = URL.createObjectURL(recordingBlob);
+
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'har-demo-recording.webm';
+        link.click();
+
+        URL.revokeObjectURL(url);
     };
 
     useEffect(() => {
@@ -269,6 +339,13 @@ const DemoPage: React.FC = () => {
         if (stage !== Stage.LiveGraphs || !demoStartTime) return;
         if (timeoutRef.current) clearTimeout(timeoutRef.current);
         timeoutRef.current = setTimeout(() => {
+            if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+                mediaRecorderRef.current.stop();
+            }
+
+            cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
+            cameraStreamRef.current = null;
+
             setStage(Stage.Summary);
             timeoutRef.current = null;
         }, demoLength * 1000);
@@ -300,6 +377,12 @@ const DemoPage: React.FC = () => {
                 setSelectedModel('');
             });
     }, [demo?.activity]);
+
+    useEffect(() => {
+        if (stage === Stage.LiveGraphs && cameraVideoRef.current && cameraStreamRef.current) {
+            cameraVideoRef.current.srcObject = cameraStreamRef.current;
+        }
+    }, [stage]);
 
     const statusLabel = actionCode === null ? 'LOADING' : ACTIVITY_NAMES[actionCode];
 
@@ -419,6 +502,23 @@ const DemoPage: React.FC = () => {
             {stage === Stage.LiveGraphs && (
                 <>
                     <Row className="mt-4">
+                        <Col md={6} className="mx-auto">
+                            <video
+                                ref={cameraVideoRef}
+                                autoPlay
+                                muted
+                                playsInline
+                                style={{
+                                    width: '100%',
+                                    borderRadius: '12px',
+                                    backgroundColor: '#000',
+                                }}
+                            />
+                        </Col>
+                    </Row>
+                    {/*TODO uncomment this when you have the backend working*/}
+
+                    {/* <Row className="mt-4">
                         {slots.A.sensor && (
                             <Col md={6}>
                                 <RMSChart sensor={slots.A.sensor} />
@@ -429,6 +529,32 @@ const DemoPage: React.FC = () => {
                                 <RMSChart sensor={slots.B.sensor} />
                             </Col>
                         )}
+                    </Row> */}
+
+                    <Row className="mt-4">
+                        <Col md={6}>
+                            <div className="rmschart-container">
+                                <div className="rmschart-header">
+                                    <span className="tag">TAG ID MOCK</span>
+                                    <span className="address">Wrist Sensor</span>
+                                    <span className="samples">0 pts</span>
+                                </div>
+
+                                <div className="rmschart-graph" />
+                            </div>
+                        </Col>
+
+                        <Col md={6}>
+                            <div className="rmschart-container">
+                                <div className="rmschart-header">
+                                    <span className="tag">TAG ID MOCK</span>
+                                    <span className="address">Leg Sensor</span>
+                                    <span className="samples">0 pts</span>
+                                </div>
+
+                                <div className="rmschart-graph" />
+                            </div>
+                        </Col>
                     </Row>
 
                     <Row className="mt-3">
@@ -456,26 +582,36 @@ const DemoPage: React.FC = () => {
                         </Col>
                     </Row>
 
-                    <Row className="mt-3">
-                        <Col className="d-flex justify-content-center">
-                            <ToggleButton
-                                id="toggle-view-classification"
-                                type="checkbox"
-                                variant="outline-primary"
-                                checked={viewClassification}
-                                value="view"
-                                style={{ fontSize: '30px' }}
-                                onChange={(e) => setViewClassification(e.currentTarget.checked)}
-                            >
-                                {viewClassification ? 'Hide classification' : 'Show classification'}
-                            </ToggleButton>
-                        </Col>
-                    </Row>
-
                     <Row className="mt-5">
                         <Col className="d-flex justify-content-center">
                             <Button variant="danger" onClick={handleStop}>
                                 Stop Demo
+                            </Button>
+                        </Col>
+                    </Row>
+                </>
+            )}
+
+            {stage === Stage.Summary && (
+                <>
+                    <Row className="mt-5">
+                        <Col className="d-flex justify-content-center gap-3">
+                            <Button
+                                variant="primary"
+                                onClick={handleDownloadRecording}
+                                disabled={!recordingBlob}
+                            >
+                                Download Recording
+                            </Button>
+
+                            <Button
+                                variant="secondary"
+                                onClick={() => {
+                                    setRecordingBlob(null);
+                                    setStage(Stage.Assign);
+                                }}
+                            >
+                                Back to Setup
                             </Button>
                         </Col>
                     </Row>
