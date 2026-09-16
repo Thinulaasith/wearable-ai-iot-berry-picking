@@ -6,7 +6,7 @@
         "training_data": "training_data.csv"
     },
     "experiment": {
-        "architecture": "both",
+        "architecture": "all",
         "model": "both",
         "test_size": 0.2,
         "random_state": 42

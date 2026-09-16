@@ -11,17 +11,13 @@ from config import (
     RANDOM_STATE,
     RF_PARAMS,
     XGB_PARAMS,
-    XGB_BINARY_PARAMS,
 )
 
 from preprocessing import create_training_data_from_merged
 
-from train import (
-    train_flat,
-    train_hierarchical,
-)
+from train import train_flat, train_hierarchical, train_hierarchical_other
 
-ARCHITECTURE_CHOICES = ("flat", "hierarchical", "both")
+ARCHITECTURE_CHOICES = ("flat", "hierarchical", "hierarchical_with_other", "all")
 
 
 # ===================================================
@@ -72,11 +68,14 @@ def _create_study_folders(
 
     (study_dir / "results").mkdir()
 
-    if architecture in ("flat", "both"):
+    if architecture in ("flat", "all"):
         (study_dir / "flat").mkdir()
 
-    if architecture in ("hierarchical", "both"):
+    if architecture in ("hierarchical", "all"):
         (study_dir / "hierarchical").mkdir()
+
+    if architecture in ("hierarchical_with_other", "all"):
+        (study_dir / "hierarchical_with_other").mkdir()
 
 
 # ===================================================
@@ -153,7 +152,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--architecture",
         choices=ARCHITECTURE_CHOICES,
-        default="both",
+        default="all",
         help="Architecture to train",
     )
 
@@ -230,7 +229,7 @@ def main() -> None:
     # Flat architecture
     # ---------------------------------------------------
 
-    if args.architecture in ("flat", "both"):
+    if args.architecture in ("flat", "all"):
 
         print("\n[study] Training flat architecture")
 
@@ -244,11 +243,25 @@ def main() -> None:
     # Standard hierarchical architecture
     # ---------------------------------------------------
 
-    if args.architecture in ("hierarchical", "both"):
+    if args.architecture in ("hierarchical", "all"):
 
         print("\n[study] Training hierarchical architecture")
 
         train_hierarchical(
+            train_csv=training_csv,
+            study_dir=study_dir,
+            model=args.model,
+        )
+
+    # ---------------------------------------------------
+    # Hierarchical with other classes architecture
+    # ---------------------------------------------------
+
+    if args.architecture in ("hierarchical_with_other", "all"):
+
+        print("\n[study] Training hierarchical with other architecture")
+
+        train_hierarchical_other(
             train_csv=training_csv,
             study_dir=study_dir,
             model=args.model,

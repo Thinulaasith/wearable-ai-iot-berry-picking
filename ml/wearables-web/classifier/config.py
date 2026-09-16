@@ -4,6 +4,18 @@ from typing import Literal, TypeAlias
 # Preprocessing
 # =========================
 
+SENSOR_POSITIONS = ["D_Leg", "D_Wrist"]
+
+# =========================
+# Preprocessing
+# =========================
+
+BODY_PARTS = [position.lower() for position in SENSOR_POSITIONS]
+
+WIDE_PREFIX_TO_TAG = {
+    position.upper(): position.lower() for position in SENSOR_POSITIONS
+}
+
 FRAMES_PER_SECOND = 30
 
 ENGINEERED_COLS = [
@@ -26,41 +38,6 @@ STAT_NAMES = (
     "auc",
     "peaks",
 )
-
-BODY_PARTS = [
-    "forearm",
-    "upper_leg",
-    "upper_back",
-    "upper_arm",
-    "back",
-    "left_wrist",
-    "right_wrist",
-    "wrist",
-    "d_leg",
-    "d_upper_arm",
-    "l_wrist",
-    "r_wrist",
-]
-
-WIDE_PREFIX_TO_TAG = {
-    "FOREARM": "forearm",
-    "UPPER_LEG": "upper_leg",
-    "UPPERLEG": "upper_leg",
-    "UPPER_BACK": "upper_back",
-    "UPPERBACK": "upper_back",
-    "UPPER_ARM": "upper_arm",
-    "UPPERARM": "upper_arm",
-    "BACK": "back",
-    "LEFT_WRIST": "left_wrist",
-    "LEFTWRIST": "left_wrist",
-    "RIGHT_WRIST": "right_wrist",
-    "RIGHTWRIST": "right_wrist",
-    "WRIST": "wrist",
-    "D_LEG": "d_leg",
-    "D_UPPER_ARM": "d_upper_arm",
-    "L_WRIST": "l_wrist",
-    "R_WRIST": "r_wrist",
-}
 
 # =========================
 # Model choices
@@ -132,7 +109,24 @@ FINAL_TO_STAGE2 = {
     BAD_PICKING: S2_BAD,
 }
 
+# =========================
+# Hierarchical With Other Stage 2
+# =========================
+OTHER = 2
 
+FINAL_TO_STAGE2_WITH_OTHER = {
+    GOOD_PICKING: S2_GOOD,
+    BAD_PICKING: S2_BAD,
+    BENDING: OTHER,
+    IDLE: OTHER,
+    PUSHING: OTHER,
+}
+
+STAGE2_WITH_OTHER_CLASSES = {
+    S2_GOOD: "Good Picking",
+    S2_BAD: "Bad Picking",
+    OTHER: "Other",
+}
 # =========================
 # Evaluation
 # =========================
@@ -141,6 +135,7 @@ CLASS_SETS = {
     "flat": FLAT_CLASSES,
     "stage1": STAGE1_CLASSES,
     "stage2": STAGE2_CLASSES,
+    "stage2_with_other": STAGE2_WITH_OTHER_CLASSES,
 }
 
 # =========================

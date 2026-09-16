@@ -2,38 +2,38 @@
 
 ## Final Performance
 
-**Accuracy:** 0.8650
+**Accuracy:** 0.8862
 
-**Macro F1:** 0.7563
+**Macro F1:** 0.7680
 
-**Weighted F1:** 0.8450
+**Weighted F1:** 0.8779
 
 ### Classification Report
 
 | Class | Precision | Recall | F1-score | Support |
 |---|---:|---:|---:|---:|
-| Bending | 0.8125 | 0.6500 | 0.7222 | 20 |
-| Idle | 0.9291 | 0.9672 | 0.9478 | 122 |
-| Good Picking | 0.5806 | 1.0000 | 0.7347 | 36 |
-| Bad Picking | 0.8235 | 0.2692 | 0.4058 | 52 |
-| Pushing | 0.9433 | 1.0000 | 0.9708 | 133 |
+| Bending | 0.7500 | 0.7895 | 0.7692 | 19 |
+| Idle | 0.8939 | 0.9672 | 0.9291 | 122 |
+| Good Picking | 0.5000 | 0.7500 | 0.6000 | 12 |
+| Bad Picking | 0.7500 | 0.4375 | 0.5526 | 48 |
+| Pushing | 0.9779 | 1.0000 | 0.9888 | 133 |
 
 ### Confusion Matrix
 
 | Actual \ Predicted | Bending | Idle | Good Picking | Bad Picking | Pushing |
 |---|---:|---:|---:|---:|---:|
-| Bending | 13 | 0 | 3 | 0 | 4 |
-| Idle | 1 | 118 | 0 | 3 | 0 |
-| Good Picking | 0 | 0 | 36 | 0 | 0 |
-| Bad Picking | 2 | 9 | 23 | 14 | 4 |
+| Bending | 15 | 2 | 0 | 0 | 2 |
+| Idle | 0 | 118 | 0 | 4 | 0 |
+| Good Picking | 0 | 0 | 9 | 3 | 0 |
+| Bad Picking | 5 | 12 | 9 | 21 | 1 |
 | Pushing | 0 | 0 | 0 | 0 | 133 |
 
 ### Normalized Confusion Matrix
 
 | Actual \ Predicted | Bending | Idle | Good Picking | Bad Picking | Pushing |
 |---|---:|---:|---:|---:|---:|
-| Bending | 0.6500 | 0.0000 | 0.1500 | 0.0000 | 0.2000 |
-| Idle | 0.0082 | 0.9672 | 0.0000 | 0.0246 | 0.0000 |
-| Good Picking | 0.0000 | 0.0000 | 1.0000 | 0.0000 | 0.0000 |
-| Bad Picking | 0.0385 | 0.1731 | 0.4423 | 0.2692 | 0.0769 |
+| Bending | 0.7895 | 0.1053 | 0.0000 | 0.0000 | 0.1053 |
+| Idle | 0.0000 | 0.9672 | 0.0000 | 0.0328 | 0.0000 |
+| Good Picking | 0.0000 | 0.0000 | 0.7500 | 0.2500 | 0.0000 |
+| Bad Picking | 0.1042 | 0.2500 | 0.1875 | 0.4375 | 0.0208 |
 | Pushing | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 1.0000 |

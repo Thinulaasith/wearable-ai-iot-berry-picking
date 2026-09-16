@@ -7,20 +7,11 @@ import numpy as np
 import pandas as pd
 from scipy.signal import find_peaks
 from scipy import integrate
+from config import BODY_PARTS, WIDE_PREFIX_TO_TAG
 
 FRAMES_PER_SECOND_DEFAULT = 30
 
 ENGINEERED_COLS = ["X", "Y", "Z", "XY", "YZ", "ZX", "XYZ", "Roll", "Pitch"]
-
-BODY_PARTS: List[str] = [
-    "d_leg",
-    "d_wrist",
-]
-
-WIDE_PREFIX_TO_TAG: Dict[str, str] = {
-    "D_LEG": "d_leg",
-    "D_WRIST": "d_wrist",
-}
 
 
 def _stats(s: pd.Series) -> Dict[str, float | int]:
@@ -127,17 +118,19 @@ def features_from_one_csv(path: str, frames_per_second: int) -> pd.DataFrame:
         raise ValueError(f"{os.path.basename(path)}: missing 'Activity' column")
 
     rows = []
-    n = len(df)
-    for start in range(0, n, frames_per_second):
-        chunk = df.iloc[start : start + frames_per_second]
-        if len(chunk) < frames_per_second:
-            continue
 
-        label = int(chunk["Activity"].mode().iloc[0])
+    # Create windows separately for each activity.
+    for activity, activity_df in df.groupby("Activity", sort=False):
+        for start in range(0, len(activity_df), frames_per_second):
+            chunk = activity_df.iloc[start : start + frames_per_second]
 
-        feat_row: Dict[str, Any] = {"action": label}
-        feat_row.update(_engineer_window_features_wide(chunk))
-        rows.append(feat_row)
+            # Discard this activity's incomplete final window.
+            if len(chunk) < frames_per_second:
+                continue
+
+            feat_row: Dict[str, Any] = {"action": int(activity)}
+            feat_row.update(_engineer_window_features_wide(chunk))
+            rows.append(feat_row)
 
     return pd.DataFrame(rows, copy=False)
 
