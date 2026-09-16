@@ -6,8 +6,9 @@ export type BodyPartKey =
     | 'upper_back'
     | 'upper_leg'
     | 'ankle'
+    | 'd_leg'
     | 'upper_arm'
-    | 'wrist'
+    | 'd_wrist'
     | 'left_wrist'
     | 'right_wrist';
 
@@ -31,6 +32,6 @@ export const demos: Demo[] = [
         icon: FaRaspberryPi,
         iconColor: 'red',
         activity: 'berry',
-        bodyParts: ['wrist', 'upper_leg'],
+        bodyParts: ['d_wrist', 'd_leg'],
     },
 ];

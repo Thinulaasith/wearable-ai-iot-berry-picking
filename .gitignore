@@ -78,10 +78,3 @@ Thumbs.db
 # =========================
 # Machine Learning / Model Files 
 # =========================
-*.h5
-*.keras
-*.pt
-*.pth
-*.pkl
-*.joblib
-
