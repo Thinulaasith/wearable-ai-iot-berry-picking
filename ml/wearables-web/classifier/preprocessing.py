@@ -9,8 +9,6 @@ from scipy.signal import find_peaks
 from scipy import integrate
 from config import BODY_PARTS, WIDE_PREFIX_TO_TAG
 
-FRAMES_PER_SECOND_DEFAULT = 30
-
 ENGINEERED_COLS = ["X", "Y", "Z", "XY", "YZ", "ZX", "XYZ", "Roll", "Pitch"]
 
 
@@ -21,11 +19,7 @@ def _stats(s: pd.Series) -> Dict[str, float | int]:
         "std": float(s.std(ddof=0)),
         "min": float(s.min()),
         "max": float(s.max()),
-        "auc": (
-            float(integrate.trapezoid(s.values))
-            if len(s.values) > 1
-            else float(s.sum())
-        ),
+        "auc": (float(integrate.trapezoid(s.values)) if len(s.values) > 1 else float(s.sum())),
         "peaks": int(len(find_peaks(s.values)[0])),
     }
 
@@ -40,22 +34,12 @@ def _compute_signals_basic(df_xyz: pd.DataFrame) -> pd.DataFrame:
     out["YZ"] = np.sqrt((df_xyz[["Acc_Y", "Acc_Z"]] ** 2).mean(axis=1))
     out["ZX"] = np.sqrt((df_xyz[["Acc_Z", "Acc_X"]] ** 2).mean(axis=1))
     out["XYZ"] = np.sqrt((df_xyz[["Acc_X", "Acc_Y", "Acc_Z"]] ** 2).mean(axis=1))
-    out["Roll"] = np.degrees(
-        np.arctan2(
-            df_xyz["Acc_Y"], np.sqrt(df_xyz["Acc_X"] ** 2 + df_xyz["Acc_Z"] ** 2)
-        )
-    )
-    out["Pitch"] = np.degrees(
-        np.arctan2(
-            -df_xyz["Acc_X"], np.sqrt(df_xyz["Acc_Y"] ** 2 + df_xyz["Acc_Z"] ** 2)
-        )
-    )
+    out["Roll"] = np.degrees(np.arctan2(df_xyz["Acc_Y"], np.sqrt(df_xyz["Acc_X"] ** 2 + df_xyz["Acc_Z"] ** 2)))
+    out["Pitch"] = np.degrees(np.arctan2(-df_xyz["Acc_X"], np.sqrt(df_xyz["Acc_Y"] ** 2 + df_xyz["Acc_Z"] ** 2)))
     return out.reset_index(drop=True)
 
 
-def _find_acc_triplet(
-    columns: List[str], prefix_upper: str
-) -> Tuple[str, str, str] | None:
+def _find_acc_triplet(columns: List[str], prefix_upper: str) -> Tuple[str, str, str] | None:
     """
     In WIDE CSVs we expect columns like:
         <Prefix>_Acc_X, <Prefix>_Acc_Y, <Prefix>_Acc_Z
@@ -136,9 +120,7 @@ def features_from_one_csv(path: str, frames_per_second: int) -> pd.DataFrame:
 
 
 # TODO add expected CSV format for the input
-def create_training_data_from_merged(
-    merged_dir: Path, frames_per_second: int, out_csv: Path
-) -> pd.DataFrame:
+def create_training_data_from_merged(merged_dir: Path, frames_per_second: int, out_csv: Path) -> pd.DataFrame:
     files = sorted(glob.glob(str(merged_dir / "*.csv")))
     if not files:
         raise FileNotFoundError(f"No CSVs found under {merged_dir}")
@@ -150,9 +132,7 @@ def create_training_data_from_merged(
             all_feat_dfs.append(feat_df)
 
     if not all_feat_dfs:
-        raise RuntimeError(
-            "No feature rows produced — check CSV schema / Activity values / window size."
-        )
+        raise RuntimeError("No feature rows produced — check CSV schema / Activity values / window size.")
 
     merged = pd.concat(all_feat_dfs, ignore_index=True)
 
@@ -166,8 +146,6 @@ def create_training_data_from_merged(
 
     out_csv.parent.mkdir(parents=True, exist_ok=True)
     merged.to_csv(out_csv, index=False)
-    print(
-        f"[build] Wrote {out_csv} with {len(merged)} rows and {merged.shape[1]} columns."
-    )
+    print(f"[build] Wrote {out_csv} with {len(merged)} rows and {merged.shape[1]} columns.")
     print("[build] Label distribution:", merged["action"].value_counts().to_dict())
     return merged

@@ -70,11 +70,7 @@ def _stats(s: pd.Series) -> Dict[str, float | int]:
         "std": float(s.std(ddof=0)),
         "min": float(s.min()),
         "max": float(s.max()),
-        "auc": (
-            float(integrate.trapezoid(s.values))
-            if len(s.values) > 1
-            else float(s.sum())
-        ),
+        "auc": (float(integrate.trapezoid(s.values)) if len(s.values) > 1 else float(s.sum())),
         "peaks": int(len(find_peaks(s.values)[0])),
     }
 
@@ -89,22 +85,12 @@ def _compute_signals_basic(df_xyz: pd.DataFrame) -> pd.DataFrame:
     out["YZ"] = np.sqrt((df_xyz[["Acc_Y", "Acc_Z"]] ** 2).mean(axis=1))
     out["ZX"] = np.sqrt((df_xyz[["Acc_Z", "Acc_X"]] ** 2).mean(axis=1))
     out["XYZ"] = np.sqrt((df_xyz[["Acc_X", "Acc_Y", "Acc_Z"]] ** 2).mean(axis=1))
-    out["Roll"] = np.degrees(
-        np.arctan2(
-            df_xyz["Acc_Y"], np.sqrt(df_xyz["Acc_X"] ** 2 + df_xyz["Acc_Z"] ** 2)
-        )
-    )
-    out["Pitch"] = np.degrees(
-        np.arctan2(
-            -df_xyz["Acc_X"], np.sqrt(df_xyz["Acc_Y"] ** 2 + df_xyz["Acc_Z"] ** 2)
-        )
-    )
+    out["Roll"] = np.degrees(np.arctan2(df_xyz["Acc_Y"], np.sqrt(df_xyz["Acc_X"] ** 2 + df_xyz["Acc_Z"] ** 2)))
+    out["Pitch"] = np.degrees(np.arctan2(-df_xyz["Acc_X"], np.sqrt(df_xyz["Acc_Y"] ** 2 + df_xyz["Acc_Z"] ** 2)))
     return out.reset_index(drop=True)
 
 
-def _find_acc_triplet(
-    columns: List[str], prefix_upper: str
-) -> Tuple[str, str, str] | None:
+def _find_acc_triplet(columns: List[str], prefix_upper: str) -> Tuple[str, str, str] | None:
     """
     In WIDE CSVs we expect columns like:
         <Prefix>_Acc_X, <Prefix>_Acc_Y, <Prefix>_Acc_Z
@@ -182,9 +168,7 @@ def features_from_one_csv(path: str, frames_per_second: int) -> pd.DataFrame:
     return pd.DataFrame(rows, copy=False)
 
 
-def create_training_data_from_merged(
-    merged_dir: Path, frames_per_second: int, out_csv: Path
-) -> pd.DataFrame:
+def create_training_data_from_merged(merged_dir: Path, frames_per_second: int, out_csv: Path) -> pd.DataFrame:
     files = sorted(glob.glob(str(merged_dir / "*.csv")))
     if not files:
         raise FileNotFoundError(f"No CSVs found under {merged_dir}")
@@ -196,9 +180,7 @@ def create_training_data_from_merged(
             all_feat_dfs.append(feat_df)
 
     if not all_feat_dfs:
-        raise RuntimeError(
-            "No feature rows produced — check CSV schema / Activity values / window size."
-        )
+        raise RuntimeError("No feature rows produced — check CSV schema / Activity values / window size.")
 
     merged = pd.concat(all_feat_dfs, ignore_index=True)
 
@@ -212,9 +194,7 @@ def create_training_data_from_merged(
 
     out_csv.parent.mkdir(parents=True, exist_ok=True)
     merged.to_csv(out_csv, index=False)
-    print(
-        f"[build] Wrote {out_csv} with {len(merged)} rows and {merged.shape[1]} columns."
-    )
+    print(f"[build] Wrote {out_csv} with {len(merged)} rows and {merged.shape[1]} columns.")
     print("[build] Label distribution:", merged["action"].value_counts().to_dict())
     return merged
 
@@ -226,18 +206,14 @@ def ensure_dir(p: Path) -> None:
     p.mkdir(parents=True, exist_ok=True)
 
 
-def train_random_forest(
-    train_csv: Path, out_model: Path
-) -> tuple[RandomForestClassifier, float]:
+def train_random_forest(train_csv: Path, out_model: Path) -> tuple[RandomForestClassifier, float]:
     df = pd.read_csv(train_csv)
     X = df.drop(columns=["action"])
     y = df["action"].astype(int)
 
     print("[train] Label distribution:", y.value_counts().to_dict())
 
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42, stratify=y
-    )
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
 
     model = RandomForestClassifier(
         n_estimators=400,
@@ -271,9 +247,7 @@ def train_xgb_if_available(train_csv: Path, out_model: Path) -> float | None:
     X = df.drop(columns=["action"])
     y = df["action"].astype(int)
 
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42, stratify=y
-    )
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
 
     xgb = XGBClassifier(
         n_estimators=300,
@@ -311,9 +285,7 @@ def _scan_existing_versions(models_dir: Path, activity: str, alg: str) -> int:
     """
     if not models_dir.exists():
         return 0
-    pat = re.compile(
-        rf"^{re.escape(alg)}_{re.escape(activity)}_v(\d+)\.(pkl|joblib)$", re.IGNORECASE
-    )
+    pat = re.compile(rf"^{re.escape(alg)}_{re.escape(activity)}_v(\d+)\.(pkl|joblib)$", re.IGNORECASE)
     max_n = 0
     for p in models_dir.iterdir():
         m = pat.match(p.name)
@@ -327,9 +299,7 @@ def _scan_existing_versions(models_dir: Path, activity: str, alg: str) -> int:
     return max_n
 
 
-def _next_versioned_name(
-    models_dir: Path, activity: str, alg: str, ext: str = "pkl"
-) -> Path:
+def _next_versioned_name(models_dir: Path, activity: str, alg: str, ext: str = "pkl") -> Path:
     """
     Compute next filename with incremented numeric suffix:
       <models_dir>/<alg>_<activity>_v<N+1>.<ext>
@@ -344,9 +314,7 @@ def _next_versioned_name(
 
 
 def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(
-        description="Train activity-specific model from wide CSVs"
-    )
+    p = argparse.ArgumentParser(description="Train activity-specific model from wide CSVs")
     p.add_argument("activity", help="Activity name (e.g. pickup, shelf, spray)")
     p.add_argument(
         "--merged-root",
@@ -399,9 +367,7 @@ def main() -> None:
     print(f"[config] merged input    : {merged_dir}")
     print(f"[config] models output   : {models_dir}")
     print(f"[config] fps/window size : {args.fps} rows")
-    print(
-        f"[config] auto-versioning : {'ON' if auto_versioning else 'OFF (fixed names)'}"
-    )
+    print(f"[config] auto-versioning : {'ON' if auto_versioning else 'OFF (fixed names)'}")
     print(f"[config] RF model file   : {rf_model_path}")
     if not args.no_xgb:
         print(f"[config] XGB model file  : {xgb_model_path}")

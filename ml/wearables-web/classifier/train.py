@@ -5,7 +5,6 @@ from typing import Any, Dict
 from pathlib import Path
 from sklearn.ensemble import RandomForestClassifier
 from xgboost import XGBClassifier
-
 from evaluation import (
     evaluate_predictions,
     save_json,
@@ -35,7 +34,6 @@ from config import (
     FINAL_TO_STAGE2,
     TEST_SIZE,
     RANDOM_STATE,
-    STAGE2_WITH_OTHER_CLASSES,
 )
 
 
@@ -516,9 +514,7 @@ def _predict_hierarchical_with_other(model1, model2, X):
             non_picking = model1.classes_ != S1_PICKING
             fallback_classes = model1.classes_[non_picking]
 
-            fallback_predictions = fallback_classes[
-                probabilities[:, non_picking].argmax(axis=1)
-            ]
+            fallback_predictions = fallback_classes[probabilities[:, non_picking].argmax(axis=1)]
 
             # Convert Stage 1 labels into final activity labels.
             stage1_to_final = {

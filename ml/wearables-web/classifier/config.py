@@ -12,11 +12,9 @@ SENSOR_POSITIONS = ["D_Leg", "D_Wrist"]
 
 BODY_PARTS = [position.lower() for position in SENSOR_POSITIONS]
 
-WIDE_PREFIX_TO_TAG = {
-    position.upper(): position.lower() for position in SENSOR_POSITIONS
-}
+WIDE_PREFIX_TO_TAG = {position.upper(): position.lower() for position in SENSOR_POSITIONS}
 
-FRAMES_PER_SECOND = 30
+FRAMES_PER_SECOND = 60
 
 ENGINEERED_COLS = [
     "X",

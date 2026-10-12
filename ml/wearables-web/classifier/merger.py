@@ -55,8 +55,7 @@ def read_sensor_file(file_path: Path, sensor_key: str) -> pd.DataFrame:
     )
 
     renamed_columns = {
-        original_name: f"{sensor_key}_{new_name}"
-        for original_name, new_name in ACCELEROMETER_COLUMNS.items()
+        original_name: f"{sensor_key}_{new_name}" for original_name, new_name in ACCELEROMETER_COLUMNS.items()
     }
 
     return df.rename(columns=renamed_columns)
@@ -90,7 +89,12 @@ for session in sessions:
             prefix = f"{person}_{activity}".casefold()
 
             matching_folders = [
-                f for f in activity_folders if f.name.casefold().startswith(prefix)
+                f
+                for f in activity_folders
+                if (
+                    f.name.casefold().startswith(f"{person}_{activity}".casefold())
+                    or f.name.casefold().startswith(activity.casefold())
+                )
             ]
 
             checked_activity_folders.extend(matching_folders)
@@ -148,7 +152,4 @@ for session in sessions:
 
     if len(checked_people) != len(person_folders):
         skipped_people = set(f.name for f in person_folders) - set(checked_people)
-        print(
-            f"Warning: Unrecognized person folders in `{session.name}`: "
-            f"{skipped_people}"
-        )
+        print(f"Warning: Unrecognized person folders in `{session.name}`: " f"{skipped_people}")
