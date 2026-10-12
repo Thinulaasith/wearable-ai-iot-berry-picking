@@ -515,7 +515,7 @@ const DemoPage: React.FC = () => {
                                 style={{
                                     width: 'auto',
                                     height: 'auto',
-                                    maxHeight: '180px',
+                                    maxHeight: '250px',
                                     maxWidth: '100%',
                                     display: 'block',
                                     margin: '0 auto',
