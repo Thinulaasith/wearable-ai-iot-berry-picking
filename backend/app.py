@@ -161,7 +161,8 @@ def _stream_worker(sensor_infos: list[tuple[str, str]], activity, stop_event: th
     for addr, (dot, _) in dots.items():
         print(f"[worker] {addr} set profile → General")
         dot.setOnboardFilterProfile("General")
-
+        print("Supports setOutputRate:", hasattr(dot, "setOutputRate"))
+        print("Current output rate:", dot.outputRate(), "Hz")
         try:
             payload = sdk.XsPayloadMode_RateQuantitieswMag
         except AttributeError:
@@ -192,11 +193,9 @@ def _stream_worker(sensor_infos: list[tuple[str, str]], activity, stop_event: th
             try:
                 ts = pkt.sampleTimeFine()
             except AttributeError:
-                ts = (pkt.timeStampFine() if hasattr(pkt, "timeStampFine") else pkt.sampleTime() * 10_000)
+                ts = pkt.timeStampFine() if hasattr(pkt, "timeStampFine") else pkt.sampleTime() * 10_000
 
-            _broadcast(
-                json.dumps({"id": addr, "ts": ts, "ax": ax, "ay": ay, "az": az}, separators=(",", ":"))
-            )
+            _broadcast(json.dumps({"id": addr, "ts": ts, "ax": ax, "ay": ay, "az": az}, separators=(",", ":")))
             last_emit = time.time()
 
             influx_writer.write(
@@ -390,9 +389,7 @@ def cli_stream(seconds: float) -> None:
                     pkt = hd.getNextPacket(addr)
             if pkt and pkt.containsOrientation():
                 eul = pkt.orientationEuler()
-                print(
-                    f"{time.time()-t0:6.2f}s roll={eul.x():6.2f} pitch={eul.y():6.2f} yaw={eul.z():6.2f}"
-                )
+                print(f"{time.time()-t0:6.2f}s roll={eul.x():6.2f} pitch={eul.y():6.2f} yaw={eul.z():6.2f}")
             time.sleep(0.01)
     except KeyboardInterrupt:
         pass
@@ -425,7 +422,9 @@ if app:
 
     @app.get("/devices")
     def api_devices():
-        return {"devices": [{"address": d.bluetoothAddress(), "id": d.deviceId().toXsString()} for d in _connected_dots]}
+        return {
+            "devices": [{"address": d.bluetoothAddress(), "id": d.deviceId().toXsString()} for d in _connected_dots]
+        }
 
     @app.post("/start")
     def api_start():

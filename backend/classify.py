@@ -59,9 +59,9 @@ BASE_DIR = Path(__file__).resolve().parent
 DEFAULT_MODEL_DIR = (BASE_DIR / "models").resolve()
 MODEL_DIR = Path(os.getenv("MODEL_DIR", str(DEFAULT_MODEL_DIR))).resolve()
 
-# Window params (closer to training cadence ~1s at 30 Hz)
-WINDOW_MS = 1200  # ~1.2 s worth of samples
-SLEEP_SEC = 1.0  # how often we pull+predict
+SAMPLES_PER_SENSOR = 60
+LOOKBACK_MS = 10000
+SLEEP_SEC = 2.0
 
 
 def _log(msg: str) -> None:
@@ -146,11 +146,7 @@ def _stats(s: pd.Series) -> Dict[str, float | int]:
         "std": float(s.std(ddof=0)),
         "min": float(s.min()),
         "max": float(s.max()),
-        "auc": (
-            float(integrate.trapezoid(s.values))
-            if len(s.values) > 1
-            else float(s.sum())
-        ),
+        "auc": (float(integrate.trapezoid(s.values)) if len(s.values) > 1 else float(s.sum())),
         "peaks": int(len(find_peaks(s.values)[0])),
     }
 
@@ -203,14 +199,10 @@ def to_dataframe(query_api, flux: str) -> pd.DataFrame:
     return df
 
 
-def run_classifier(
-    activity: str, timeout: int, stop_event: threading.Event, model_name: str
-) -> None:
+def run_classifier(activity: str, timeout: int, stop_event: threading.Event, model_name: str) -> None:
     _log(f"Starting (activity='{activity}', timeout={timeout}s, model='{model_name}')")
     if not (INFLUXDB_URL.startswith("http://") or INFLUXDB_URL.startswith("https://")):
-        raise RuntimeError(
-            f"INFLUX_URL must start with http:// or https:// (got {INFLUXDB_URL})"
-        )
+        raise RuntimeError(f"INFLUX_URL must start with http:// or https:// (got {INFLUXDB_URL})")
 
     client = InfluxDBClient(url=INFLUXDB_URL, token=INFLUXDB_TOKEN, org=INFLUXDB_ORG)
     query_api = client.query_api()
@@ -219,23 +211,15 @@ def run_classifier(
     # Load model
     model_path = (MODEL_DIR / model_name).resolve()
     if not model_path.exists():
-        contents = (
-            ", ".join(sorted([f.name for f in MODEL_DIR.glob("*")]))
-            if MODEL_DIR.exists()
-            else "<missing dir>"
-        )
-        raise FileNotFoundError(
-            f"Model not found: {model_path}\nMODEL_DIR={MODEL_DIR}\nContents={contents}"
-        )
+        contents = ", ".join(sorted([f.name for f in MODEL_DIR.glob("*")])) if MODEL_DIR.exists() else "<missing dir>"
+        raise FileNotFoundError(f"Model not found: {model_path}\nMODEL_DIR={MODEL_DIR}\nContents={contents}")
 
     _log(f"Loading model: {model_path}")
     model = joblib.load(model_path)
 
     expected_cols = list(getattr(model, "feature_names_in_", []))
     if not expected_cols:
-        _log(
-            "Warning: model has no 'feature_names_in_' — predictions may fail if columns mismatch."
-        )
+        _log("Warning: model has no 'feature_names_in_' — predictions may fail if columns mismatch.")
 
     if expected_cols:
         available_fams_raw, fam_norm_to_raw = model_family_maps(expected_cols)
@@ -247,7 +231,7 @@ def run_classifier(
 
     _log(f"Model families discovered (raw): {available_fams_raw}")
 
-    flux = build_flux(INFLUXDB_BUCKET, INFLUXDB_QUERY_MEASUREMENT, WINDOW_MS)
+    flux = build_flux(INFLUXDB_BUCKET, INFLUXDB_QUERY_MEASUREMENT, LOOKBACK_MS)
 
     start = time.time()
     try:
@@ -260,25 +244,21 @@ def run_classifier(
 
             if "_time" in df.columns:
                 df.set_index("_time", inplace=True, drop=True)
+                df.sort_index(inplace=True)
 
             if "body_part" not in df.columns:
                 _log("No 'body_part' tag in rows; skipping window.")
                 time.sleep(SLEEP_SEC)
                 continue
 
-            present_parts_norm = [
-                to_snake(p)
-                for p in pd.Series(df["body_part"]).dropna().unique().tolist()
-            ]
+            present_parts_norm = [to_snake(p) for p in pd.Series(df["body_part"]).dropna().unique().tolist()]
             present_parts_norm = sorted(present_parts_norm)[:2]
             if len(present_parts_norm) < 2:
                 _log(f"Need 2 body parts; saw: {present_parts_norm or '[]'}")
                 time.sleep(SLEEP_SEC * 0.5)
                 continue
 
-            def pick_two_norm(
-                present_norm: List[str], avail_norm: List[str]
-            ) -> List[str]:
+            def pick_two_norm(present_norm: List[str], avail_norm: List[str]) -> List[str]:
                 fams = [p for p in present_norm if p in avail_norm]
                 for f in avail_norm:
                     if len(fams) >= 2:
@@ -287,37 +267,36 @@ def run_classifier(
                         fams.append(f)
                 return fams[:2]
 
-            famA_norm, famB_norm = pick_two_norm(
-                present_parts_norm, available_fams_norm
-            )
+            famA_norm, famB_norm = pick_two_norm(present_parts_norm, available_fams_norm)
 
             famA_raw = fam_norm_to_raw.get(famA_norm, available_fams_raw[0])
-            famB_raw = fam_norm_to_raw.get(
-                famB_norm, available_fams_raw[1 if len(available_fams_raw) > 1 else 0]
-            )
+            famB_raw = fam_norm_to_raw.get(famB_norm, available_fams_raw[1 if len(available_fams_raw) > 1 else 0])
 
-            _log(
-                f"Window parts(norm)={present_parts_norm} → families(raw)='{famA_raw}', '{famB_raw}'"
-            )
+            _log(f"Window parts(norm)={present_parts_norm} → families(raw)='{famA_raw}', '{famB_raw}'")
 
             partA_norm, partB_norm = present_parts_norm[0], present_parts_norm[1]
-            df_A = df[to_snake_series(df["body_part"]) == partA_norm][
-                ["Acc_X", "Acc_Y", "Acc_Z"]
-            ].reset_index(drop=True)
-            df_B = df[to_snake_series(df["body_part"]) == partB_norm][
-                ["Acc_X", "Acc_Y", "Acc_Z"]
-            ].reset_index(drop=True)
-            if df_A.empty or df_B.empty:
-                _log("One of the parts has no rows in window; skipping.")
-                time.sleep(SLEEP_SEC * 0.5)
+
+            df_A = (
+                df[to_snake_series(df["body_part"]) == partA_norm][["Acc_X", "Acc_Y", "Acc_Z"]]
+                .tail(SAMPLES_PER_SENSOR)
+                .reset_index(drop=True)
+            )
+
+            df_B = (
+                df[to_snake_series(df["body_part"]) == partB_norm][["Acc_X", "Acc_Y", "Acc_Z"]]
+                .tail(SAMPLES_PER_SENSOR)
+                .reset_index(drop=True)
+            )
+
+            if len(df_A) < SAMPLES_PER_SENSOR or len(df_B) < SAMPLES_PER_SENSOR:
+                _log(f"Insufficient readings: A={len(df_A)}, B={len(df_B)}")
+                time.sleep(SLEEP_SEC)
                 continue
 
             feats_A = compute_features(compute_signals(df_A))
             feats_B = compute_features(compute_signals(df_B))
 
-            combined: Dict[str, Any] = {
-                f"{famA_raw}_{k}": v for k, v in feats_A.items()
-            }
+            combined: Dict[str, Any] = {f"{famA_raw}_{k}": v for k, v in feats_A.items()}
             combined.update({f"{famB_raw}_{k}": v for k, v in feats_B.items()})
 
             X = pd.DataFrame([combined])
@@ -328,18 +307,11 @@ def run_classifier(
             proba = getattr(model, "predict_proba", None)
             if callable(proba):
                 p = np.round(proba(X)[0], 3).tolist()
-                _log(
-                    f"Prediction: {pred} | "
-                    f"Classes={model.classes_.tolist()} | Proba={p}"
-                )
+                _log(f"Prediction: {pred} | " f"Classes={model.classes_.tolist()} | Proba={p}")
             else:
                 _log(f"Prediction: {pred}")
 
-            point = (
-                Point(INFLUXDB_RESULT_MEASUREMENT)
-                .field("action", pred)
-                .time(time.time_ns(), WritePrecision.NS)
-            )
+            point = Point(INFLUXDB_RESULT_MEASUREMENT).field("action", pred).time(time.time_ns(), WritePrecision.NS)
 
             write_api.write(bucket=INFLUXDB_BUCKET, org=INFLUXDB_ORG, record=point)
 
