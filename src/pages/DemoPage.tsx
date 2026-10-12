@@ -513,11 +513,14 @@ const DemoPage: React.FC = () => {
                                 muted
                                 playsInline
                                 style={{
-                                    width: '100%',
-                                    height: '180px',
-                                    objectFit: 'cover',
+                                    width: 'auto',
+                                    height: 'auto',
+                                    maxHeight: '180px',
+                                    maxWidth: '100%',
+                                    display: 'block',
+                                    margin: '0 auto',
+                                    objectFit: 'contain',
                                     borderRadius: '12px',
-                                    backgroundColor: '#000',
                                 }}
                             />
                         </Col>
