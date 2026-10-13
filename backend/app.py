@@ -209,6 +209,7 @@ def _stream_worker(sensor_infos: list[tuple[str, str]], activity, stop_event: th
                     .field("Acc_X", ax)
                     .field("Acc_Y", ay)
                     .field("Acc_Z", az)
+                    .field("sample_time", int(ts))
                 ),
             )
             time.sleep(0.003)
@@ -296,6 +297,7 @@ def _stream_worker2(sensor_infos: list[tuple[str, str]], activity: str, stop_eve
                                 .field("Acc_X", ax)
                                 .field("Acc_Y", ay)
                                 .field("Acc_Z", az)
+                                .field("sample_time", int(ts))
                             ),
                         )
 

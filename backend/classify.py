@@ -19,6 +19,7 @@
 
 from __future__ import annotations
 
+import math
 import os
 import re
 import time
@@ -59,9 +60,18 @@ BASE_DIR = Path(__file__).resolve().parent
 DEFAULT_MODEL_DIR = (BASE_DIR / "models").resolve()
 MODEL_DIR = Path(os.getenv("MODEL_DIR", str(DEFAULT_MODEL_DIR))).resolve()
 
-SAMPLES_PER_SENSOR = 60
-LOOKBACK_MS = 10000
-SLEEP_SEC = 2.0
+# Configurable parameters
+WINDOW_SECONDS = 2
+SENSOR_RATE_HZ = 30
+BUFFER_SECONDS = 1
+PREDICTION_INTERVAL_SECONDS = 1.0
+MAX_UNMATCHED = 2
+# ----------------
+
+SAMPLES_PER_WINDOW = int(WINDOW_SECONDS * SENSOR_RATE_HZ)
+EXPECTED_GAP_US = math.ceil(1_000_000 / SENSOR_RATE_HZ)
+MAX_GAP_US = math.ceil(EXPECTED_GAP_US * 1.5)
+QUERY_MS = int((WINDOW_SECONDS + BUFFER_SECONDS) * 1000)
 
 
 def _log(msg: str) -> None:
@@ -179,7 +189,7 @@ def build_flux(bucket: str, measurement: str, window_ms: int) -> str:
 from(bucket: "{bucket}")
 |> range(start: -{window_ms}ms)
 |> filter(fn: (r) => r._measurement == "{measurement}")
-|> filter(fn: (r) => r._field == "Acc_X" or r._field == "Acc_Y" or r._field == "Acc_Z")
+|> filter(fn: (r) => r._field == "Acc_X" or r._field == "Acc_Y" or r._field == "Acc_Z" or r._field == "sample_time")
 |> sort(columns: ["_time"])
 |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
 """
@@ -231,7 +241,7 @@ def run_classifier(activity: str, timeout: int, stop_event: threading.Event, mod
 
     _log(f"Model families discovered (raw): {available_fams_raw}")
 
-    flux = build_flux(INFLUXDB_BUCKET, INFLUXDB_QUERY_MEASUREMENT, LOOKBACK_MS)
+    flux = build_flux(INFLUXDB_BUCKET, INFLUXDB_QUERY_MEASUREMENT, QUERY_MS)
 
     start = time.time()
     try:
@@ -239,7 +249,7 @@ def run_classifier(activity: str, timeout: int, stop_event: threading.Event, mod
             df = to_dataframe(query_api, flux)
             if df.empty:
                 _log("No samples in window; sleeping …")
-                time.sleep(SLEEP_SEC)
+                time.sleep(PREDICTION_INTERVAL_SECONDS)
                 continue
 
             if "_time" in df.columns:
@@ -248,14 +258,19 @@ def run_classifier(activity: str, timeout: int, stop_event: threading.Event, mod
 
             if "body_part" not in df.columns:
                 _log("No 'body_part' tag in rows; skipping window.")
-                time.sleep(SLEEP_SEC)
+                time.sleep(PREDICTION_INTERVAL_SECONDS)
+                continue
+
+            if "sample_time" not in df.columns:
+                _log("WARNING: sample_time missing from InfluxDB")
+                time.sleep(PREDICTION_INTERVAL_SECONDS)
                 continue
 
             present_parts_norm = [to_snake(p) for p in pd.Series(df["body_part"]).dropna().unique().tolist()]
             present_parts_norm = sorted(present_parts_norm)[:2]
             if len(present_parts_norm) < 2:
                 _log(f"Need 2 body parts; saw: {present_parts_norm or '[]'}")
-                time.sleep(SLEEP_SEC * 0.5)
+                time.sleep(PREDICTION_INTERVAL_SECONDS * 0.5)
                 continue
 
             def pick_two_norm(present_norm: List[str], avail_norm: List[str]) -> List[str]:
@@ -274,24 +289,72 @@ def run_classifier(activity: str, timeout: int, stop_event: threading.Event, mod
 
             _log(f"Window parts(norm)={present_parts_norm} → families(raw)='{famA_raw}', '{famB_raw}'")
 
-            partA_norm, partB_norm = present_parts_norm[0], present_parts_norm[1]
+            partA_norm, partB_norm = present_parts_norm[:2]
+            cols = ["sample_time", "Acc_X", "Acc_Y", "Acc_Z"]
 
-            df_A = (
-                df[to_snake_series(df["body_part"]) == partA_norm][["Acc_X", "Acc_Y", "Acc_Z"]]
-                .tail(SAMPLES_PER_SENSOR)
-                .reset_index(drop=True)
-            )
+            # Extract sensor readings
+            df_A = df.loc[to_snake_series(df["body_part"]) == partA_norm, cols].dropna().copy()
 
-            df_B = (
-                df[to_snake_series(df["body_part"]) == partB_norm][["Acc_X", "Acc_Y", "Acc_Z"]]
-                .tail(SAMPLES_PER_SENSOR)
-                .reset_index(drop=True)
-            )
+            df_B = df.loc[to_snake_series(df["body_part"]) == partB_norm, cols].dropna().copy()
 
-            if len(df_A) < SAMPLES_PER_SENSOR or len(df_B) < SAMPLES_PER_SENSOR:
-                _log(f"Insufficient readings: A={len(df_A)}, B={len(df_B)}")
-                time.sleep(SLEEP_SEC)
+            for sensor_df in (df_A, df_B):
+                sensor_df["sample_time"] = sensor_df["sample_time"].astype("int64")
+                sensor_df.drop_duplicates("sample_time", keep="last", inplace=True)
+
+            # Join by synchronized timestamp
+            paired = pd.merge(
+                df_A,
+                df_B,
+                on="sample_time",
+                how="inner",
+                suffixes=("_A", "_B"),
+                validate="one_to_one",
+            ).sort_values("sample_time")
+
+            # Require enough matched readings
+            if len(paired) < SAMPLES_PER_WINDOW:
+                _log(f"Insufficient matched pairs: {len(paired)}/{SAMPLES_PER_WINDOW}")
+                time.sleep(PREDICTION_INTERVAL_SECONDS)
                 continue
+
+            # Latest 60 matched pairs
+            window = paired.tail(SAMPLES_PER_WINDOW)
+
+            start_ts = int(window["sample_time"].iloc[0])
+            end_ts = int(window["sample_time"].iloc[-1])
+
+            # Check for unmatched readings within the window
+            a_times = set(df_A.loc[df_A["sample_time"].between(start_ts, end_ts), "sample_time"])
+            b_times = set(df_B.loc[df_B["sample_time"].between(start_ts, end_ts), "sample_time"])
+
+            unmatched = len(a_times ^ b_times)
+
+            if unmatched > MAX_UNMATCHED:
+                _log(f"WARNING: {unmatched} unmatched sensor readings")
+
+            # Check consecutive timestamp gaps
+            gaps = np.diff(window["sample_time"].to_numpy(dtype=np.int64))
+            invalid_gaps = gaps[(gaps <= 0) | (gaps > MAX_GAP_US)]
+
+            if len(invalid_gaps) > 0:
+                _log(
+                    f"WARNING: {len(invalid_gaps)} irregular gaps | "
+                    f"Maximum: {gaps.max()} µs | Allowed: {MAX_GAP_US} µs"
+                )
+
+            _log(f"Window: {len(window)} pairs | " f"Unmatched: {unmatched} | " f"Max gap: {gaps.max()} µs")
+
+            # Restore original feature engineering input format
+            df_A = window[["Acc_X_A", "Acc_Y_A", "Acc_Z_A"]].copy()
+            df_B = window[["Acc_X_B", "Acc_Y_B", "Acc_Z_B"]].copy()
+
+            df_A.columns = ["Acc_X", "Acc_Y", "Acc_Z"]
+            df_B.columns = ["Acc_X", "Acc_Y", "Acc_Z"]
+
+            df_A.reset_index(drop=True, inplace=True)
+            df_B.reset_index(drop=True, inplace=True)
+
+            # Feature engineering
 
             feats_A = compute_features(compute_signals(df_A))
             feats_B = compute_features(compute_signals(df_B))
@@ -315,7 +378,7 @@ def run_classifier(activity: str, timeout: int, stop_event: threading.Event, mod
 
             write_api.write(bucket=INFLUXDB_BUCKET, org=INFLUXDB_ORG, record=point)
 
-            time.sleep(SLEEP_SEC)
+            time.sleep(PREDICTION_INTERVAL_SECONDS)
 
     finally:
         try:
