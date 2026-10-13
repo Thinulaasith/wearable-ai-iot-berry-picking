@@ -86,10 +86,15 @@ const BODY_PART_META: Record<BodyPartKey, { label: string; img: string; desc: st
         img: upperArmImg,
         desc: 'Place on the back of the dominant upper arm.',
     },
-    wrist: {
+    d_wrist: {
         label: 'Wrist (dominant)',
         img: wristImg,
         desc: 'Place on the outside of the dominant wrist.',
+    },
+    d_leg: {
+        label: 'Leg (dominant)',
+        img: legImg,
+        desc: 'Place on the outer thigh of the dominant leg.',
     },
     left_wrist: {
         label: 'Left Wrist',
