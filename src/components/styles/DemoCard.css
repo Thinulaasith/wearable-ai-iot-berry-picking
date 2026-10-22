@@ -1,0 +1,54 @@
+.demo-card-container {
+    display: flex;
+    align-items: center;
+    background-color: #2a2f37;
+    padding: 1rem 1.5rem;
+    border-radius: 12px;
+    border: 1px solid #3c3f46;
+    box-shadow:
+      inset 0 0 0 1px #50545d,
+      0 4px 8px rgba(0, 0, 0, 0.4);
+    color: #e2e8f0;
+    gap: 1.5rem;
+    cursor: pointer;          /* optional: makes the card clickable */
+    flex-wrap: wrap;
+  }
+  
+  .demo-left img {
+    border-radius: 6px;
+    object-fit: cover;
+  }
+  
+  .vertical-divider {
+    width: 2px;
+    height: 90px;             /* taller divider for bigger image */
+    background-color: #50545d;
+  }
+  
+  .demo-info-section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    min-width: 220px;
+  }
+  
+  .demo-info-item {
+    font-size: 1.1rem;
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+  }
+  
+  .label {
+    font-weight: 600;
+    color: #a0aec0;
+    min-width: 110px;
+  }
+  
+  .value {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 16px;
+  }
+  

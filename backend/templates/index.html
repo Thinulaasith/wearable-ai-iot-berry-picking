@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Live X-Accel</title>
+   <script src="/socket.io/socket.io.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/socket.io@4/dist/socket.io.min.js"></script>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 2rem; }
+    #chartBox { width: 90vw; height: 60vh; }
+    button { padding: .5rem 1rem; margin-right: .5rem; }
+  </style>
+</head>
+<body>
+  <h1>Movella DOT – Real-time X acceleration</h1>
+  <button id="start">Start</button>
+  <button id="stop">Stop</button>
+  <p id="status"></p>
+  <canvas id="chartBox"></canvas>
+
+  <script>
+    const ctx = document.getElementById("chartBox").getContext("2d");
+    const data = { labels: [], datasets: [{ label: "X accel (m/s²)", data: [], tension: 0 }] };
+    const chart = new Chart(ctx, { type: "line", data, options: { animation: false, scales:{x:{title:{display:true,text:"Time (s)"}}} } });
+
+    const socket = io();
+
+    document.getElementById("start").onclick = () => socket.emit("start");
+    document.getElementById("stop").onclick  = () => socket.emit("stop");
+
+    socket.on("accel", ({ t, x }) => {
+      data.labels.push(t.toFixed(2));
+      data.datasets[0].data.push(x);
+      if (data.labels.length > 300) {      // keep last ~300 samples
+        data.labels.shift();
+        data.datasets[0].data.shift();
+      }
+      chart.update("none");
+    });
+
+    socket.on("error", msg => {
+      document.getElementById("status").textContent = "Error: " + msg;
+    });
+  </script>
+</body>
+</html>
