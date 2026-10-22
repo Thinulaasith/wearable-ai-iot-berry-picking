@@ -1,0 +1,116 @@
+/* ===== theme helpers – tweak in one place ===== */
+:root {
+  --col-accent: #0d6efd;
+  /* Bootstrap primary */
+  --col-accent-soft: #e9f2ff;
+  /* faint tint of primary */
+  --col-border: #ced4da;
+  /* Bootstrap border colour */
+  --col-text-main: #212529;
+  --col-text-sub: #6c757d;
+  --radius-lg: 14px;
+  --shadow-card: 0 6px 14px rgba(0, 0, 0, 0.08);
+  --shadow-card-lg: 0 10px 22px rgba(0, 0, 0, 0.12);
+}
+
+/* ===== container ===== */
+.body-part-box {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+
+  padding: 18px 24px;
+  border-radius: var(--radius-lg);
+  background: #fff;
+  border: 1px solid var(--col-border);
+  box-shadow: var(--shadow-card);
+  color: var(--col-text-main);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  height: 170px;
+  /* equal height rows */
+}
+
+.body-part-box:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-card-lg);
+}
+
+/* variants */
+.body-part-box.unassigned {
+  background: linear-gradient(135deg,
+      #fafbff 0%,
+      #f2f4ff 100%);
+  /* subtle bluish gradient */
+}
+
+.body-part-box.assigned {
+  background: var(--col-accent-soft);
+  border: 1px solid var(--col-accent);
+}
+
+/* ===== image ===== */
+.image-section {
+  width: 130px;
+  height: 130px;
+  flex: 0 0 130px;
+
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: #fff;
+  display: grid;
+  place-items: center;
+  /* shorthand for centering */
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.05);
+}
+
+.image-section img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  /* show whole icon */
+}
+
+/* ===== text ===== */
+.info-section {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.body-part-title {
+  font-weight: 600;
+  font-size: 2.3rem;
+  letter-spacing: 0.4px;
+  margin-bottom: 0.35rem;
+}
+
+.body-part-sub {
+  font-size: 1.65rem;
+  color: var(--col-text-sub);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ===== right-hand action ===== */
+.action-section {
+  flex: 0 0 120px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.action-section .dropdown-toggle {
+  min-width: 100%;
+  /* full width button */
+}
+
+/* give the “Change” button stronger contrast on assigned rows */
+.body-part-box.assigned .dropdown-toggle {
+  background: var(--col-accent);
+  color: #fff;
+  border: none;
+}
+
+.body-part-box.assigned .dropdown-toggle:hover,
+.body-part-box.assigned .dropdown-toggle:focus {
+  background: #0057d9;
+}

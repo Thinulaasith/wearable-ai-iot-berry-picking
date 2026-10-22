@@ -1,0 +1,15 @@
+/* app.css – cleaned for Bootstrap layout */
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: #f8f9fa; /* Bootstrap light background */
+  font-family: system-ui, sans-serif;
+  font-size: 20px;
+}

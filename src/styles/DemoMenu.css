@@ -1,0 +1,41 @@
+.manage-demos-container {
+    display: flex;
+    flex-direction: column;
+    padding: 1rem;
+    justify-content: center;
+    align-items: center;
+  }
+  
+  .manage-demos-title {
+    margin-top: 1%;
+    font-size: 2rem;
+    font-weight: 600;
+  }
+
+  .manage-demos-text {
+    font-size: 1.5rem;
+    margin-top: 1%;
+  }
+  
+  .manage-demos-divider {
+    width: 90%;
+    border-color: #d1d5db; /* Tailwind gray-300 */
+    margin-bottom: 1rem;
+  }
+  
+  /* Two-column grid */
+  .demo-list {
+    margin-top: 2%;
+    width: 90%;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+  }
+  
+  /* Optional: collapse to single column on narrow screens */
+  @media (max-width: 640px) {
+    .demo-list {
+      grid-template-columns: 1fr;
+    }
+  }
+  
